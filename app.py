@@ -12,6 +12,7 @@ import umap
 from bokeh.plotting import figure, show
 from bokeh.models import ColumnDataSource, HoverTool, LassoSelectTool
 from bokeh.embed import components
+import plotly.express as px
 
 # Load vision model and processor
 model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32")
@@ -48,7 +49,7 @@ def visualize_embeddings(embeddings, method="pca"):
 st.set_page_config(layout="wide")
 st.title("CLIP Image Embeddings Visualizer")
 with st.sidebar:
-    image_files = st.file_uploader("Upload images", type=["jpg", "png"], accept_multiple_files=True)
+    image_files = st.file_uploader("Upload images", type=["jpg", "png","bmp"], accept_multiple_files=True)
     reducer = st.selectbox("Dimensionality Reduction",options=['pca','tsne','umap'])
     runner = st.button("Generate!")
 
@@ -72,32 +73,16 @@ if image_files and runner:
         'image': image_paths
     })
 
-    # Create Bokeh figure
-    source = ColumnDataSource(data=df)
-    hover = HoverTool(tooltips=[
-        ("image", "@image"),
-    ])
-    p = figure(title="CLIP Image Embeddings", tools=[hover, LassoSelectTool()], width=800, height=600)
-    p.scatter('x', 'y', size=10, source=source)
+    # Create Plotly figure
+    fig = px.scatter(df, x='x', y='y')
+    fig.update_traces(textposition='top center', hoverinfo='all')
+    fig.update_layout(title="CLIP Image Embeddings", width=800, height=600)
 
-    # Display Bokeh figure
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown("# Embeddings")
-        script, div = components(p)
-        st.markdown(f'<bokeh>{script}{div}</bokeh>', unsafe_allow_html=True)
+    # Display Plotly figure
+    # col1, col2 = st.columns([2, 1])
+    # with col1:
+    st.markdown("# Embeddings")
+    st.plotly_chart(fig)
 
-    # Store selected points
-    if "selected_points" not in st.session_state:
-        st.session_state.selected_points = []
-
-    # Display thumbnail images
-    with col2:
-        st.markdown("# Selected Images")
-        if st.button("Get Selected Points"):
-            # Get selected points from Bokeh source
-            selected_indices = source.selected.indices
-            st.session_state.selected_points = selected_indices
-            for index in selected_indices:
-                selected_image = image_data[index]
-                st.image(selected_image, caption=selected_image.name, width=100)
+    # # Store selected points
+    # if "selected_points
