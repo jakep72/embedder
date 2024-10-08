@@ -1,10 +1,11 @@
 import dash
 from dash import dcc
 from dash import html
+import dash_auth
 from dash.dependencies import Input, Output, State
 import plotly.express as px
 import torch
-from transformers import CLIPModel, CLIPProcessor, SamModel, SamProcessor, AutoImageProcessor, AutoModel
+from transformers import CLIPModel, CLIPProcessor, SamModel, SamProcessor, AutoImageProcessor, AutoModel, ResNetModel
 from sklearn.manifold import TSNE
 import pandas as pd
 from dash.exceptions import PreventUpdate
@@ -14,7 +15,11 @@ import io
 import numpy as np
 import umap
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import normalize
 
+VALID_USERNAME_PASSWORD_PAIRS = {
+    'user': 'pass'
+}
 # Model loading
 def load_model(embedding_model):
     """Load CLIP model and processor"""
@@ -26,8 +31,10 @@ def load_model(embedding_model):
         model = SamModel.from_pretrained("facebook/sam-vit-large").to(device)
         processor = SamProcessor.from_pretrained("facebook/sam-vit-large")
     elif embedding_model == 'dino':
-        model = AutoModel.from_pretrained("facebook/dinov2-base").to(device)
-        processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
+        # model = AutoModel.from_pretrained("facebook/dinov2-base").to(device)
+        # processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
+        model = AutoModel.from_pretrained("microsoft/resnet-50").to(device)
+        processor = AutoImageProcessor.from_pretrained("microsoft/resnet-50")
 
     return model, processor, device
 
@@ -97,6 +104,15 @@ def get_app_layout():
                             )
                         ],
                         style={"padding": "15px", "border": "1px solid #ddd", "borderRadius": "5px"}
+                    ),
+                    html.Div(
+                        [
+                            html.Button('Generate!',
+                                        id='generator',
+                                        n_clicks=0,
+                                        style={"width": "100%", "height": "30px", "fontSize": "14px"})
+                        ],
+                        style={"padding": "15px", "border": "1px solid #ddd", "borderRadius": "5px"}
                     )
                 ], style={"width": "15%", "display": "inline-block", "vertical-align": "top", "padding": "20px", "height": "80vh", "backgroundColor": "#f9f9f9", "borderRight": "1px solid #ddd"}),
                 html.Div([
@@ -116,7 +132,7 @@ def get_app_layout():
     ],style={'height':'100vh'})
 
 # Callbacks
-def update_graph(uploaded_images, reduction_method, embedding_model):
+def update_graph(n_clicks, uploaded_images, reduction_method, embedding_model):
     """Update graph with image embeddings"""
     if uploaded_images is None:
         raise PreventUpdate
@@ -137,6 +153,7 @@ def update_graph(uploaded_images, reduction_method, embedding_model):
             if embedding_model == "clip":
                 outputs = model(**image)
                 embedding = outputs.last_hidden_state[:, 0, :]
+                print(embedding.shape)
                 embeddings.append(embedding.squeeze().cpu().numpy())
             elif embedding_model == "sam":
                 embedding = model.get_image_embeddings(image.pixel_values)[:, 0, :]
@@ -144,11 +161,13 @@ def update_graph(uploaded_images, reduction_method, embedding_model):
                 embeddings.append(embedding_reshape)
             elif embedding_model == "dino":
                 outputs = model(**image)
-                embedding = outputs.last_hidden_state[:, 0, :]
-                embeddings.append(embedding.squeeze().cpu().numpy())
+                embedding = outputs.last_hidden_state
+                print(embedding.shape)
+                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(embedding, (1, 1)).squeeze().cpu().numpy())
+        
 
-    embeddings_array = np.array(embeddings)
-    # Reduce dimensionality
+    embeddings_array = normalize(np.array(embeddings))
+    print(embeddings_array.shape)    # Reduce dimensionality
     if reduction_method == "tsne":
         tsne = TSNE(n_components=2, perplexity=min(30, len(embeddings_array) - 1))
         reduced_embeddings = tsne.fit_transform(embeddings_array)
@@ -157,7 +176,7 @@ def update_graph(uploaded_images, reduction_method, embedding_model):
         reduced_embeddings = pca.fit_transform(embeddings_array)
 
     elif reduction_method == "umap":
-        umapper = umap.UMAP(random_state=42,n_neighbors=10)
+        umapper = umap.UMAP(random_state=42,n_neighbors=15,min_dist=0.0,metric='cosine')
         reduced_embeddings = umapper.fit_transform(embeddings_array)
 
     # Create figure
@@ -174,16 +193,21 @@ def update_graph(uploaded_images, reduction_method, embedding_model):
 
 def store_images(uploaded_images):
     """Store uploaded images"""
+    print(len(uploaded_images))
     if uploaded_images is None:
         raise PreventUpdate
 
     images = []
+
     for encoded_image in uploaded_images:
         image = decode_image(encoded_image)
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
         encoded_image = base64.b64encode(buffered.getvalue()).decode()
         images.append(encoded_image)  # Store base64 encoded string
+    
+    print(f'{len(images)} Images Stored!')
+
 
     return images
 
@@ -215,14 +239,17 @@ def display_thumbnails(selected_data, images):
 # App definition
 def create_app():
     app = dash.Dash(__name__)
+    dash_auth.BasicAuth(app,VALID_USERNAME_PASSWORD_PAIRS)
     app.layout = get_app_layout()
 
     app.callback(
         Output("embeddings-graph", "figure"),
-        [Input("upload-images", "contents"),
-         Input("reduction-method-dropdown", "value"),
-         Input("embedding-model-dropdown", "value")
-         ]
+        Input("generator","n_clicks"),
+        [State("upload-images", "contents"),
+         State("reduction-method-dropdown", "value"),
+         State("embedding-model-dropdown", "value")
+         ],
+         
     )(update_graph)
 
     app.callback(
@@ -241,4 +268,4 @@ def create_app():
 # Run app
 if __name__ == "__main__":
     app = create_app()
-    app.run_server(debug=True)
+    app.run_server(debug=False)
