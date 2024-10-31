@@ -12,7 +12,7 @@
     (Linux) source bin/activate
 
 ### Install from source
-    From <your_env_name>
+    cd to <your_env_name>
     git clone https://github.com/jakep72/embedder.git
     cd embedder
     pip install -r requirements.txt
