@@ -30,7 +30,7 @@ def load_model(embedding_model):
     elif embedding_model == 'sam':
         model = SamModel.from_pretrained("facebook/sam-vit-large").to(device)
         processor = SamProcessor.from_pretrained("facebook/sam-vit-large")
-    elif embedding_model == 'dino':
+    elif embedding_model == 'resnet':
         # model = AutoModel.from_pretrained("facebook/dinov2-base").to(device)
         # processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
         model = AutoModel.from_pretrained("microsoft/resnet-50").to(device)
@@ -75,7 +75,7 @@ def get_app_layout():
                     ),
                     html.Div(
                         [
-                            html.P("Select Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
+                            html.P("Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             dcc.Dropdown(
                                 id="reduction-method-dropdown",
                                 options=[
@@ -91,13 +91,13 @@ def get_app_layout():
                     ),
                     html.Div(
                         [
-                            html.P("Select Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
+                            html.P("Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             dcc.Dropdown(
                                 id="embedding-model-dropdown",
                                 options=[
                                     {"label": "CLIP", "value": "clip"},
                                     {"label": "Segment Anything", "value": "sam"},
-                                    {"label": "DINO", "value": "dino"}
+                                    {"label": "ResNet50", "value": "resnet"}
                                 ],
                                 value="clip",
                                 style={"width": "100%", "height": "30px", "fontSize": "14px"}
@@ -159,7 +159,7 @@ def update_graph(n_clicks, uploaded_images, reduction_method, embedding_model):
                 embedding = model.get_image_embeddings(image.pixel_values)[:, 0, :]
                 embedding_reshape = embedding.squeeze().flatten().cpu().numpy()
                 embeddings.append(embedding_reshape)
-            elif embedding_model == "dino":
+            elif embedding_model == "resnet":
                 outputs = model(**image)
                 embedding = outputs.last_hidden_state
                 print(embedding.shape)
