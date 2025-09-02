@@ -28,7 +28,7 @@ def load_model(embedding_model):
     elif embedding_model == 'sam':
         model = SamModel.from_pretrained("facebook/sam-vit-large").to(device)
         processor = SamProcessor.from_pretrained("facebook/sam-vit-large")
-    elif embedding_model == 'resnet':
+    elif embedding_model == 'dino':
         # model = AutoModel.from_pretrained("facebook/dinov2-base").to(device)
         # processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
         processor = AutoImageProcessor.from_pretrained("facebook/dinov3-vits16-pretrain-lvd1689m")
@@ -79,7 +79,6 @@ def get_app_layout():
                     html.Div(
                         [
                             html.P("Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
-                            html.P("Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             dcc.Dropdown(
                                 id="reduction-method-dropdown",
                                 options=[
@@ -95,7 +94,6 @@ def get_app_layout():
                     ),
                     html.Div(
                         [
-                            html.P("Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             html.P("Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             dcc.Dropdown(
                                 id="embedding-model-dropdown",
