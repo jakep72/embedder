@@ -17,9 +17,7 @@ import umap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import normalize
 
-VALID_USERNAME_PASSWORD_PAIRS = {
-    'user': 'pass'
-}
+
 # Model loading
 def load_model(embedding_model):
     """Load CLIP model and processor"""
@@ -30,11 +28,16 @@ def load_model(embedding_model):
     elif embedding_model == 'sam':
         model = SamModel.from_pretrained("facebook/sam-vit-large").to(device)
         processor = SamProcessor.from_pretrained("facebook/sam-vit-large")
-    elif embedding_model == 'dino':
+    elif embedding_model == 'resnet':
         # model = AutoModel.from_pretrained("facebook/dinov2-base").to(device)
         # processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
-        model = AutoModel.from_pretrained("microsoft/resnet-50").to(device)
-        processor = AutoImageProcessor.from_pretrained("microsoft/resnet-50")
+        processor = AutoImageProcessor.from_pretrained("facebook/dinov3-vits16-pretrain-lvd1689m")
+        model = AutoModel.from_pretrained(
+            "facebook/dinov3-vits16-pretrain-lvd1689m",
+            dtype=torch.float16,
+            device_map="auto",
+            attn_implementation="sdpa"
+        )
 
     return model, processor, device
 
@@ -75,7 +78,8 @@ def get_app_layout():
                     ),
                     html.Div(
                         [
-                            html.P("Select Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
+                            html.P("Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
+                            html.P("Reduction Method", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             dcc.Dropdown(
                                 id="reduction-method-dropdown",
                                 options=[
@@ -91,13 +95,14 @@ def get_app_layout():
                     ),
                     html.Div(
                         [
-                            html.P("Select Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
+                            html.P("Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
+                            html.P("Embedding Model", style={"textAlign": "center","font-size": "14px", "marginBottom": "5px"}),
                             dcc.Dropdown(
                                 id="embedding-model-dropdown",
                                 options=[
                                     {"label": "CLIP", "value": "clip"},
                                     {"label": "Segment Anything", "value": "sam"},
-                                    {"label": "DINO", "value": "dino"}
+                                    {"label": "DINOV3", "value": "dino"}
                                 ],
                                 value="clip",
                                 style={"width": "100%", "height": "30px", "fontSize": "14px"}
@@ -153,17 +158,14 @@ def update_graph(n_clicks, uploaded_images, reduction_method, embedding_model):
             if embedding_model == "clip":
                 outputs = model(**image)
                 embedding = outputs.last_hidden_state[:, 0, :]
-                print(embedding.shape)
                 embeddings.append(embedding.squeeze().cpu().numpy())
             elif embedding_model == "sam":
                 embedding = model.get_image_embeddings(image.pixel_values)[:, 0, :]
                 embedding_reshape = embedding.squeeze().flatten().cpu().numpy()
                 embeddings.append(embedding_reshape)
             elif embedding_model == "dino":
-                outputs = model(**image)
-                embedding = outputs.last_hidden_state
-                print(embedding.shape)
-                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(embedding, (1, 1)).squeeze().cpu().numpy())
+                embedding = model(**image)
+                embeddings.append(embedding.pooler_output.squeeze().cpu().numpy())
         
 
     embeddings_array = normalize(np.array(embeddings))
@@ -239,7 +241,7 @@ def display_thumbnails(selected_data, images):
 # App definition
 def create_app():
     app = dash.Dash(__name__)
-    dash_auth.BasicAuth(app,VALID_USERNAME_PASSWORD_PAIRS)
+    # dash_auth.BasicAuth(app,VALID_USERNAME_PASSWORD_PAIRS)
     app.layout = get_app_layout()
 
     app.callback(
