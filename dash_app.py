@@ -28,7 +28,7 @@ def load_model(embedding_model):
     elif embedding_model == 'sam':
         model = SamModel.from_pretrained("facebook/sam-vit-large").to(device)
         processor = SamProcessor.from_pretrained("facebook/sam-vit-large")
-    elif embedding_model == 'resnet':
+    elif embedding_model == 'dino':
         # model = AutoModel.from_pretrained("facebook/dinov2-base").to(device)
         # processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
         processor = AutoImageProcessor.from_pretrained("facebook/dinov3-vits16-pretrain-lvd1689m")
